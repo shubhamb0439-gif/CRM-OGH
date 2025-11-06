@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { realtimeManager } from '../lib/realtimeManager';
 
 /**
- * Hook for managing realtime subscriptions with automatic cleanup
+ * Hook for listening to realtime changes via custom events
+ * The realtime manager automatically handles all subscriptions globally
  */
 export function useRealtimeSubscription(
   channelName: string,
@@ -15,12 +15,20 @@ export function useRealtimeSubscription(
       return;
     }
 
-    const unsubscribe = realtimeManager.subscribe(
-      channelName,
-      table,
-      callback
-    );
+    // Map table names to event names
+    const eventName = `supabase:${table}:change`;
 
-    return unsubscribe;
-  }, [channelName, table, enabled]);
+    const handleEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      callback(customEvent.detail);
+    };
+
+    console.log(`[useRealtimeSubscription] Listening to ${eventName}`);
+    window.addEventListener(eventName, handleEvent);
+
+    return () => {
+      console.log(`[useRealtimeSubscription] Removing listener for ${eventName}`);
+      window.removeEventListener(eventName, handleEvent);
+    };
+  }, [table, enabled]);
 }
