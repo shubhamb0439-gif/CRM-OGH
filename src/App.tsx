@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from './lib/queryClient';
+import { initRealtimeManager } from './lib/realtimeManager';
 import ErrorBoundary from './components/ErrorBoundary';
 import Home from './pages/Home';
 import AdminLogin from './pages/AdminLogin';
@@ -20,6 +21,8 @@ export default function App() {
   const [showDevtools, setShowDevtools] = useState(false);
 
   useEffect(() => {
+    initRealtimeManager();
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.shiftKey && event.key === 'A') {
         event.preventDefault();
