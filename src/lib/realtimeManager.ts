@@ -16,6 +16,11 @@ let keepAliveInterval: number | null = null;
 // Initialized flag
 let isInitialized = false;
 
+// Prevent multiple simultaneous reconnections
+let isReconnecting = false;
+let lastVisibilityChange = 0;
+const VISIBILITY_DEBOUNCE = 1000; // 1 second debounce
+
 /**
  * Calculate exponential backoff delay with jitter
  */
@@ -123,29 +128,47 @@ function handleSubscriptionStatus(status: string, channel: RealtimeChannel) {
  * Schedule reconnection with exponential backoff
  */
 function scheduleReconnect() {
+  if (isReconnecting) {
+    console.log('[RealtimeManager] ⏳ Reconnection already in progress, skipping schedule');
+    return;
+  }
+
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.error('[RealtimeManager] Max reconnection attempts reached. Manual refresh required.');
+    console.error('[RealtimeManager] ❌ Max reconnection attempts reached. Manual refresh required.');
     return;
   }
 
   const delay = getBackoffDelay(reconnectAttempts);
   reconnectAttempts++;
 
-  console.log(`[RealtimeManager] Reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+  console.log(`[RealtimeManager] 🔄 Reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
 
   setTimeout(async () => {
-    console.log('[RealtimeManager] Attempting to reconnect...');
-    await cleanupSubscriptions();
-
-    // Refresh session if needed
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('[RealtimeManager] Session refresh error:', error);
-    } else if (!session) {
-      console.warn('[RealtimeManager] No active session found');
+    if (isReconnecting) {
+      console.log('[RealtimeManager] ⏳ Another reconnection in progress, skipping...');
+      return;
     }
 
-    subscribeToChannels();
+    isReconnecting = true;
+    console.log('[RealtimeManager] 🔄 Attempting to reconnect...');
+
+    try {
+      await cleanupSubscriptions();
+
+      // Refresh session if needed
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('[RealtimeManager] ❌ Session refresh error:', error);
+      } else if (!session) {
+        console.warn('[RealtimeManager] ⚠️ No active session found');
+      } else {
+        console.log('[RealtimeManager] ✅ Session is valid');
+      }
+
+      subscribeToChannels();
+    } finally {
+      isReconnecting = false;
+    }
   }, delay);
 }
 
@@ -190,18 +213,44 @@ function startKeepalive() {
  * Immediately reconnect when tab becomes visible
  */
 function handleVisibilityChange() {
-  const now = new Date().toISOString();
+  const now = Date.now();
+  const timeSinceLastChange = now - lastVisibilityChange;
+
+  // Debounce rapid visibility changes
+  if (timeSinceLastChange < VISIBILITY_DEBOUNCE) {
+    console.log(`[RealtimeManager] ⏸️ Ignoring rapid visibility change (${timeSinceLastChange}ms since last)`);
+    return;
+  }
+
+  lastVisibilityChange = now;
+  const timestamp = new Date().toISOString();
+
   if (document.hidden) {
-    console.log(`[RealtimeManager] 🌙 Tab hidden at ${now} - connections will be maintained in background`);
+    console.log(`[RealtimeManager] 🌙 Tab hidden at ${timestamp}`);
     console.log('[RealtimeManager] Active channels:', channelRefs.length);
+    // Don't disconnect - just let it idle
   } else {
-    console.log(`[RealtimeManager] 👁️ Tab visible at ${now} - reconnecting channels...`);
+    console.log(`[RealtimeManager] 👁️ Tab visible at ${timestamp}`);
+
+    // Check if already reconnecting
+    if (isReconnecting) {
+      console.log('[RealtimeManager] ⏳ Already reconnecting, skipping...');
+      return;
+    }
+
+    isReconnecting = true;
     console.log('[RealtimeManager] Previous reconnect attempts:', reconnectAttempts);
     reconnectAttempts = 0; // Reset attempts on manual visibility change
-    cleanupSubscriptions().then(() => {
-      console.log('[RealtimeManager] Cleanup complete, resubscribing...');
-      subscribeToChannels();
-    });
+
+    cleanupSubscriptions()
+      .then(() => {
+        console.log('[RealtimeManager] ✅ Cleanup complete, resubscribing...');
+        subscribeToChannels();
+      })
+      .finally(() => {
+        isReconnecting = false;
+        console.log('[RealtimeManager] ✅ Reconnection process complete');
+      });
   }
 }
 
