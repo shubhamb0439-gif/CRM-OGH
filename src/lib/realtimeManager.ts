@@ -46,18 +46,19 @@ async function cleanupSubscriptions() {
  * Subscribe to all required channels
  */
 function subscribeToChannels() {
-  console.log('[RealtimeManager] Subscribing to channels...');
+  const timestamp = new Date().toISOString();
+  console.log(`[RealtimeManager] 📡 Subscribing to channels at ${timestamp}...`);
 
   // Subscribe to leads table
   const leadsChannel = supabase
     .channel('leads-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
-      console.log('[RealtimeManager] Leads change:', payload);
+      console.log('[RealtimeManager] 📥 Leads change:', payload);
       // Dispatch custom event for React components to listen
       window.dispatchEvent(new CustomEvent('supabase:leads:change', { detail: payload }));
     })
     .subscribe((status) => {
-      console.log('[RealtimeManager] Leads channel status:', status);
+      console.log('[RealtimeManager] 📡 Leads channel status:', status);
       handleSubscriptionStatus(status, leadsChannel);
     });
 
@@ -65,11 +66,11 @@ function subscribeToChannels() {
   const servicesChannel = supabase
     .channel('services-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, (payload) => {
-      console.log('[RealtimeManager] Services change:', payload);
+      console.log('[RealtimeManager] 📥 Services change:', payload);
       window.dispatchEvent(new CustomEvent('supabase:services:change', { detail: payload }));
     })
     .subscribe((status) => {
-      console.log('[RealtimeManager] Services channel status:', status);
+      console.log('[RealtimeManager] 📡 Services channel status:', status);
       handleSubscriptionStatus(status, servicesChannel);
     });
 
@@ -77,11 +78,11 @@ function subscribeToChannels() {
   const bookingsChannel = supabase
     .channel('bookings-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'consultancy_bookings_v2' }, (payload) => {
-      console.log('[RealtimeManager] Bookings change:', payload);
+      console.log('[RealtimeManager] 📥 Bookings change:', payload);
       window.dispatchEvent(new CustomEvent('supabase:bookings:change', { detail: payload }));
     })
     .subscribe((status) => {
-      console.log('[RealtimeManager] Bookings channel status:', status);
+      console.log('[RealtimeManager] 📡 Bookings channel status:', status);
       handleSubscriptionStatus(status, bookingsChannel);
     });
 
@@ -89,27 +90,32 @@ function subscribeToChannels() {
   const assessmentsChannel = supabase
     .channel('assessments-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'assessments' }, (payload) => {
-      console.log('[RealtimeManager] Assessments change:', payload);
+      console.log('[RealtimeManager] 📥 Assessments change:', payload);
       window.dispatchEvent(new CustomEvent('supabase:assessments:change', { detail: payload }));
     })
     .subscribe((status) => {
-      console.log('[RealtimeManager] Assessments channel status:', status);
+      console.log('[RealtimeManager] 📡 Assessments channel status:', status);
       handleSubscriptionStatus(status, assessmentsChannel);
     });
 
   channelRefs = [leadsChannel, servicesChannel, bookingsChannel, assessmentsChannel];
+  console.log(`[RealtimeManager] ✅ Subscribed to ${channelRefs.length} channels`);
 }
 
 /**
  * Handle subscription status changes
  */
 function handleSubscriptionStatus(status: string, channel: RealtimeChannel) {
+  const timestamp = new Date().toISOString();
   if (status === 'SUBSCRIBED') {
-    console.log('[RealtimeManager] Channel subscribed successfully');
+    console.log(`[RealtimeManager] ✅ Channel subscribed successfully at ${timestamp}`);
     reconnectAttempts = 0; // Reset on successful connection
   } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-    console.warn('[RealtimeManager] Channel closed or error, scheduling reconnect...');
+    console.warn(`[RealtimeManager] ⚠️ Channel ${status} at ${timestamp}, scheduling reconnect...`);
+    console.warn('[RealtimeManager] Channel state:', channel.state);
     scheduleReconnect();
+  } else {
+    console.log(`[RealtimeManager] 📊 Channel status: ${status} at ${timestamp}`);
   }
 }
 
@@ -154,19 +160,27 @@ function startKeepalive() {
 
   const KEEPALIVE_INTERVAL = 4.5 * 60 * 1000; // 4.5 minutes
 
+  console.log('[RealtimeManager] 💓 Starting keepalive (ping every 4.5 minutes)');
+
   keepAliveInterval = window.setInterval(async () => {
+    const timestamp = new Date().toISOString();
     try {
-      console.log('[RealtimeManager] Sending keepalive ping...');
+      console.log(`[RealtimeManager] 💓 Sending keepalive ping at ${timestamp}`);
+      console.log('[RealtimeManager] Tab visibility:', document.hidden ? 'hidden' : 'visible');
+
       const { error } = await supabase.from('leads').select('id').limit(1).maybeSingle();
 
       if (error) {
-        console.warn('[RealtimeManager] Keepalive failed:', error);
+        console.warn('[RealtimeManager] ❌ Keepalive failed:', error);
+        console.warn('[RealtimeManager] Error code:', error.code);
+        console.warn('[RealtimeManager] Error message:', error.message);
         scheduleReconnect();
       } else {
-        console.log('[RealtimeManager] Keepalive successful');
+        console.log(`[RealtimeManager] ✅ Keepalive successful at ${timestamp}`);
       }
     } catch (err) {
-      console.error('[RealtimeManager] Keepalive error:', err);
+      console.error('[RealtimeManager] ❌ Keepalive exception:', err);
+      console.error('[RealtimeManager] Stack:', err instanceof Error ? err.stack : 'No stack trace');
     }
   }, KEEPALIVE_INTERVAL);
 }
@@ -176,12 +190,16 @@ function startKeepalive() {
  * Immediately reconnect when tab becomes visible
  */
 function handleVisibilityChange() {
+  const now = new Date().toISOString();
   if (document.hidden) {
-    console.log('[RealtimeManager] Tab hidden, pausing activity');
+    console.log(`[RealtimeManager] 🌙 Tab hidden at ${now} - connections will be maintained in background`);
+    console.log('[RealtimeManager] Active channels:', channelRefs.length);
   } else {
-    console.log('[RealtimeManager] Tab visible, reconnecting channels...');
+    console.log(`[RealtimeManager] 👁️ Tab visible at ${now} - reconnecting channels...`);
+    console.log('[RealtimeManager] Previous reconnect attempts:', reconnectAttempts);
     reconnectAttempts = 0; // Reset attempts on manual visibility change
     cleanupSubscriptions().then(() => {
+      console.log('[RealtimeManager] Cleanup complete, resubscribing...');
       subscribeToChannels();
     });
   }
@@ -193,11 +211,14 @@ function handleVisibilityChange() {
  */
 export function initRealtimeManager() {
   if (isInitialized) {
-    console.warn('[RealtimeManager] Already initialized');
+    console.warn('[RealtimeManager] ⚠️ Already initialized');
     return;
   }
 
-  console.log('[RealtimeManager] Initializing...');
+  const timestamp = new Date().toISOString();
+  console.log(`[RealtimeManager] 🚀 Initializing at ${timestamp}...`);
+  console.log('[RealtimeManager] Browser:', navigator.userAgent);
+  console.log('[RealtimeManager] Online status:', navigator.onLine ? 'online' : 'offline');
   isInitialized = true;
 
   // Initial subscription
@@ -208,17 +229,30 @@ export function initRealtimeManager() {
 
   // Listen for visibility changes
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  console.log('[RealtimeManager] 👁️ Visibility change listener registered');
+
+  // Listen for online/offline events
+  window.addEventListener('online', () => {
+    console.log('[RealtimeManager] 🌐 Network online - reconnecting...');
+    cleanupSubscriptions().then(() => subscribeToChannels());
+  });
+
+  window.addEventListener('offline', () => {
+    console.log('[RealtimeManager] 📴 Network offline');
+  });
 
   // Listen for auth state changes (session refresh)
   supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('[RealtimeManager] Auth state changed:', event);
+    const authTimestamp = new Date().toISOString();
+    console.log(`[RealtimeManager] 🔐 Auth state changed at ${authTimestamp}:`, event);
+    console.log('[RealtimeManager] Session exists:', !!session);
 
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      console.log('[RealtimeManager] Reconnecting after auth change...');
+      console.log('[RealtimeManager] 🔄 Reconnecting after auth change...');
       await cleanupSubscriptions();
       subscribeToChannels();
     } else if (event === 'SIGNED_OUT') {
-      console.log('[RealtimeManager] Cleaning up after sign out');
+      console.log('[RealtimeManager] 👋 Cleaning up after sign out');
       await cleanupSubscriptions();
       if (keepAliveInterval) {
         clearInterval(keepAliveInterval);
@@ -229,12 +263,14 @@ export function initRealtimeManager() {
 
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
-    console.log('[RealtimeManager] Page unloading, cleaning up...');
+    console.log('[RealtimeManager] 🛑 Page unloading, cleaning up...');
     cleanupSubscriptions();
     if (keepAliveInterval) {
       clearInterval(keepAliveInterval);
     }
   });
+
+  console.log('[RealtimeManager] ✅ Initialization complete');
 }
 
 // Legacy compatibility - export a manager-like object

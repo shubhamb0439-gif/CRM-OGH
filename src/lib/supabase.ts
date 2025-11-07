@@ -34,6 +34,46 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+// Log all database queries for debugging
+const originalFrom = supabase.from.bind(supabase);
+supabase.from = ((table: string) => {
+  console.log(`[Supabase Query] Querying table: ${table}`);
+  const builder = originalFrom(table);
+
+  // Intercept the query execution
+  const originalThen = builder.then?.bind(builder);
+  if (originalThen) {
+    builder.then = function(onfulfilled: any, onrejected: any) {
+      console.log(`[Supabase Query] Executing query on table: ${table}`);
+      const startTime = performance.now();
+
+      return originalThen(
+        (result: any) => {
+          const duration = (performance.now() - startTime).toFixed(2);
+          if (result.error) {
+            console.error(`[Supabase Query] ❌ Error on ${table} (${duration}ms):`, result.error);
+          } else {
+            console.log(`[Supabase Query] ✅ Success on ${table} (${duration}ms):`, {
+              count: result.data?.length || 0,
+              data: result.data
+            });
+          }
+          return onfulfilled ? onfulfilled(result) : result;
+        },
+        (error: any) => {
+          const duration = (performance.now() - startTime).toFixed(2);
+          console.error(`[Supabase Query] ❌ Promise rejection on ${table} (${duration}ms):`, error);
+          return onrejected ? onrejected(error) : Promise.reject(error);
+        }
+      );
+    };
+  }
+
+  return builder;
+}) as any;
+
+console.log('[Supabase] Client initialized successfully');
+
 export type Lead = {
   id: string;
   name: string;

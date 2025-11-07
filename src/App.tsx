@@ -21,7 +21,12 @@ export default function App() {
   const [showDevtools, setShowDevtools] = useState(false);
 
   useEffect(() => {
+    console.log('[App] 🎬 Application starting...');
+    console.log('[App] Timestamp:', new Date().toISOString());
+    console.log('[App] Initializing realtime manager...');
+
     initRealtimeManager();
+    console.log('[App] ✅ Realtime manager initialized');
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.shiftKey && event.key === 'A') {
