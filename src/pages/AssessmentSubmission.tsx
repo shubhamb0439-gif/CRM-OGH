@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { PRODUCT_SERVICES } from '../lib/constants';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 
 const ASSESSMENT_QUESTIONS = [
@@ -90,8 +89,7 @@ export default function AssessmentSubmission() {
     phone: '',
     hospital_name: '',
     country: '',
-    state: '',
-    product_service: ''
+    state: ''
   });
   const [availableStates, setAvailableStates] = useState<string[]>([]);
   const [startTime] = useState(Date.now());
@@ -201,7 +199,7 @@ export default function AssessmentSubmission() {
         score,
         time_taken: timeTaken,
         efficiency_level: efficiencyLevel,
-        product_service: formData.product_service,
+        product_service: recommendedServices.join(', ') || 'Not specified',
         selected_challenges: selectedChallenges,
         recommended_services: recommendedServices,
         comments: `Specialties: ${selectedSpecialties.join(', ')}`
@@ -229,7 +227,7 @@ export default function AssessmentSubmission() {
           source: 'Assessment',
           score,
           efficiency_level: efficiencyLevel,
-          product_service: formData.product_service,
+          product_service: recommendedServices.join(', ') || 'Not specified',
           selected_services: recommendedServices,
           comments: `Specialties: ${selectedSpecialties.join(', ')}, Country: ${countryName}`,
           status: 'New'
@@ -461,25 +459,6 @@ export default function AssessmentSubmission() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Product of Interest *
-                  </label>
-                  <select
-                    value={formData.product_service}
-                    onChange={(e) => setFormData({ ...formData, product_service: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                    style={{ color: formData.product_service ? '#0f172a' : '#64748b' }}
-                    required
-                  >
-                    <option value="">Select Product/Service</option>
-                    {PRODUCT_SERVICES.map((service) => (
-                      <option key={service} value={service} style={{ color: '#0f172a' }}>
-                        {service}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
 
               <div>
