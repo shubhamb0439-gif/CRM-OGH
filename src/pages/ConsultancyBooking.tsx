@@ -496,18 +496,40 @@ export default function ConsultancyBooking() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Hospital/Facility Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.facility}
-                    onChange={(e) => handleTextChange('facility', e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] placeholder:text-slate-500"
-                    placeholder="Enter facility name"
-                    required
-                  />
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Hospital/Facility Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.facility}
+                      onChange={(e) => handleTextChange('facility', e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] placeholder:text-slate-500"
+                      placeholder="Enter facility name"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Product of Interest *
+                    </label>
+                    <select
+                      value={formData.product_service}
+                      onChange={(e) => setFormData({ ...formData, product_service: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                      style={{ color: formData.product_service ? '#0f172a' : '#64748b' }}
+                      required
+                    >
+                      <option value="">Select Product/Service</option>
+                      {productServices.map((service) => (
+                        <option key={service} value={service} style={{ color: '#0f172a' }}>
+                          {service}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-6">
